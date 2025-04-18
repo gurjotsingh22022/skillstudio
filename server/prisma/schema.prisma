@@ -1,0 +1,164 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id          Int       @id @default(autoincrement())
+  name        String
+  email       String       @unique
+  image       String?
+  roleID      Int // Adjusted to BigInt to match Role.id
+  role        Role         @relation(fields: [roleID], references: [id])
+  provider    String
+  providerID  String
+  socialURL   String?
+  providerURL String?
+  phoneNumber String? // Note: Phone numbers are typically stored as String
+  isActive    Boolean      @default(true)
+  isBlocked   Boolean      @default(false)
+  createdAt   DateTime     @default(now())
+  Courses     Course[]
+  Enrollment  Enrollment[]
+  Payment     Payment[]
+
+  @@index([id])
+  @@index([email])
+}
+
+model Course {
+  id            Int            @id @default(autoincrement())
+  publicId      String?         @unique @default(uuid())
+  title         String
+  description   String
+  thumbnailPublicId   String
+  thumbnailUrl        String
+  thumbnailMetadata   Json
+  userId        Int // Matches User.id (BigInt)
+  User          User           @relation(fields: [userId], references: [id])
+  price         Float
+  originalPrice Float?
+  timeAccess    Float? // Example: "4,6,12"
+  duration      Float         @default(0) // Example: 4.5 (hours/days)
+  language      String?
+  instructors   String? // Comma-separated names or JSON
+  counseling    String? // Description of counseling options
+  status        String      @default("draft")
+  isActive      Boolean     @default(false)
+  courseDetail  CourseDetail[]
+  Section       Section[]
+  Enrollment    Enrollment[]
+
+  @@index([userId])
+  @@index([id])
+}
+
+model Role {
+  id    Int @id @default(autoincrement())
+  Title String @unique
+  Users User[]
+}
+
+model CourseDetail {
+  id            String    @id @default(uuid())
+  course        Course    @relation(fields: [courseId], references: [id])
+  courseId      Int
+  objectives    String[]
+  prerequisites String[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([courseId])
+}
+
+model Section {
+  id             String       @id @default(uuid())
+  title          String
+  description    String?
+  order          Int
+  course         Course @relation(fields: [courseId], references: [id])
+  courseId       Int
+  lessons        Lesson[]
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  @@index([id])
+  @@index([courseId])
+}
+
+model Lesson {
+  id        String   @id @default(uuid())
+  title     String
+  content   String?
+  videoUrl  String
+  videoPublicId   String
+  videoMetadata   Json
+  duration  Float // in minutes
+  section   Section  @relation(fields: [sectionId], references: [id])
+  sectionId String
+  isFree    Boolean  @default(false)
+  isActive  Boolean  @default(false)
+  order     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sectionId])
+}
+
+model Enrollment {
+  id               String           @id @default(uuid())
+  user             User             @relation(fields: [userId], references: [id])
+  userId           Int
+  course           Course           @relation(fields: [courseId], references: [id])
+  courseId         Int
+  enrolledAt       DateTime         @default(now())
+  status           EnrollmentStatus @default(ACTIVE)
+  completedAt      DateTime?
+  payments         Payment          @relation(fields: [paymentReference], references: [id])
+  paymentReference String
+
+  @@unique([userId, courseId])
+  @@index([userId])
+  @@index([courseId])
+}
+
+enum EnrollmentStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  PAUSED
+}
+
+model Payment {
+  id            String        @id @default(uuid())
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("USD")
+  paymentMethod PaymentMethod
+  transactionId String        @unique
+  status        PaymentStatus @default(PENDING)
+  user          User          @relation(fields: [userId], references: [id])
+  userId        Int
+  enrollment    Enrollment[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([userId])
+}
+
+enum PaymentMethod {
+  CARD
+  WALLET
+  BANK_TRANSFER
+}
+
+enum PaymentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  DISPUTED
+}
